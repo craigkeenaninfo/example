@@ -162,6 +162,13 @@ A developer running Windows will have to do independent research to identify Win
 
         git clone https://github.com/craigkeenaninfo/example.git
 
+    Configure Remote Origin
+
+        git remote add origin git@github.com:example/example.git
+        git remote set-url origin git@github.com:example/example.git
+
+	Note: Requires ssh key setup for ssh push/pull
+    
     Edit / Update replacing example values with your application details
 
         atom <filename>
