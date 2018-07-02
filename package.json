@@ -1,0 +1,39 @@
+{
+  "name": "portfolio",
+  "version": "1.0.0",
+  "description": "Cloud Portfolio",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test-watch": "jest --watch",
+    "webpack": "webpack",
+    "webpack-watch": "webpack --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/craigkeenaninfo/portfolio.git"
+  },
+  "author": "Craig Keenan <craigkeenaninfo@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/craigkeenaninfo/portfolio/issues"
+  },
+  "homepage": "https://github.com/craigkeenaninfo/portfolio#readme",
+  "dependencies": {
+    "babel-jest": "^23.2.0",
+    "enzyme": "^3.3.0",
+    "enzyme-adapter-react-16": "^1.1.1",
+    "jest": "^23.2.0",
+    "react": "^16.4.1",
+    "react-dom": "^16.4.1",
+    "react-test-renderer": "^16.4.1"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.3",
+    "babel-loader": "^7.1.4",
+    "babel-preset-env": "^1.7.0",
+    "babel-preset-react": "^6.24.1",
+    "webpack": "^4.14.0",
+    "webpack-cli": "^3.0.8"
+  }
+}

@@ -1,0 +1,1211 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Serverless Static Website
+Resources:
+  # IAM
+  Role1:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: !FindInMap [Role1, !Ref PropertyConfig, AssumeRolePolicyDocument]
+      RoleName: !FindInMap [Role1, !Ref PropertyConfig, RoleName]
+  Role2:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: !FindInMap [Role2, !Ref PropertyConfig, AssumeRolePolicyDocument]
+      RoleName: !FindInMap [Role2, !Ref PropertyConfig, RoleName]
+  Role3:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: !FindInMap [Role3, !Ref PropertyConfig, AssumeRolePolicyDocument]
+      RoleName: !FindInMap [Role3, !Ref PropertyConfig, RoleName]
+  # KMS
+  Key1:
+    DependsOn: ["Role1","Role2","Role3"]
+    Type: "AWS::KMS::Key"
+    Properties: 
+      Description: !FindInMap [Key1, !Ref PropertyConfig, Description]
+      Enabled: !FindInMap [Key1, !Ref PropertyConfig, Enabled]
+      EnableKeyRotation: !FindInMap [Key1, !Ref PropertyConfig, EnableKeyRotation]
+      KeyPolicy: 
+        Version: "2012-10-17"
+        Id: "Policy1"
+        Statement: 
+          -
+            Sid: "Key Administrators"
+            Effect: "Allow"
+            Principal:
+              AWS: 
+                - !Join ['', ['arn:aws:iam::', !Ref 'AWS::AccountId', ':root']]
+            Action: '*'
+            Resource: '*'
+          - 
+            Sid: "Key Users"
+            Effect: "Allow"
+            Principal:
+              AWS: 
+                - !Join ['', ['arn:aws:iam::', !Ref 'AWS::AccountId', ':root']]
+                - !Join   
+                  - ''
+                  - - 'arn:aws:iam::'
+                    - !Ref 'AWS::AccountId'
+                    - ':role/'
+                    - !FindInMap [Role1, !Ref PropertyConfig, RoleName]
+                - !Join 
+                  - ''
+                  - - 'arn:aws:iam::'
+                    - !Ref 'AWS::AccountId'
+                    - ':role/'
+                    - !FindInMap [Role2, !Ref PropertyConfig, RoleName]
+                - !Join
+                  - ''
+                  - - 'arn:aws:iam::'
+                    - !Ref 'AWS::AccountId'
+                    - ':role/'
+                    - !FindInMap [Role3, !Ref PropertyConfig, RoleName]
+            Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+            Resource: '*'  
+          -
+            Sid: "Allow CloudWatch to Use Key"
+            Effect: "Allow"
+            Principal:
+              Service: 
+                - !Join ['', ['logs.', !Ref 'AWS::Region', '.amazonaws.com']]
+            Action: 
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+            Resource: '*' 
+      Tags:
+        -  
+          Key: Name
+          Value: !FindInMap [Alias1, !Ref PropertyConfig, AliasName]
+  Alias1:
+    DependsOn: "Key1"
+    Type: "AWS::KMS::Alias"
+    Properties:
+      AliasName: !Join ['', ['alias/', !FindInMap [Alias1, !Ref PropertyConfig, AliasName]]]
+      TargetKeyId: !Ref Key1
+  # S3
+  Bucket1:
+    Type: "AWS::S3::Bucket"
+    Properties: 
+      AccessControl: !FindInMap [Bucket1, !Ref PropertyConfig, AccessControl]
+      BucketName: !Ref SiteNameSite1
+      LifecycleConfiguration:
+        Rules:
+          - 
+            AbortIncompleteMultipartUpload: 
+              DaysAfterInitiation: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1DaysAfterInitiation]
+            ExpirationInDays: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1ExpirationInDays]
+            Id: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1Id]
+            NoncurrentVersionExpirationInDays: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1NoncurrentVersionExpirationInDays]
+            NoncurrentVersionTransitions:
+              - 
+                StorageClass: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1NoncurrentVersionTransitions1StorageClass]
+                TransitionInDays: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1NoncurrentVersionTransitions1TransitionInDays]
+            Prefix: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1Prefix]
+            Status: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1Status]
+            Transitions:
+              - 
+                StorageClass: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1Transitions1StorageClass]
+                TransitionInDays: !FindInMap [Bucket1, !Ref PropertyConfig, LifecycleConfigurationRules1Transitions1TransitionInDays]
+      Tags:
+        - Key: Name
+          Value: !Ref SiteNameSite1
+      VersioningConfiguration:
+        Status: !FindInMap [Bucket1, !Ref PropertyConfig, VersioningConfigurationStatus]
+      WebsiteConfiguration:
+        ErrorDocument: !FindInMap [Bucket1, !Ref PropertyConfig, WebsiteConfigurationErrorDocument]
+        IndexDocument: !FindInMap [Bucket1, !Ref PropertyConfig, WebsiteConfigurationIndexDocument]
+  # CloudFront
+  Distribution1:
+    DependsOn: ["Bucket1"]
+    Type: "AWS::CloudFront::Distribution"
+    Properties:
+      DistributionConfig: 
+        Aliases:
+          - !Ref DomainNameDomain1
+          - !Join ['', ['www.', !Ref DomainNameDomain1]]
+        Comment: !FindInMap [Distribution1, !Ref PropertyConfig, Comment]
+        DefaultCacheBehavior:
+          AllowedMethods:
+            !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorAllowedMethods]
+          CachedMethods:
+            !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorCachedMethods]
+          DefaultTTL: !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorDefaultTTL]
+          ForwardedValues:
+            Cookies:
+              Forward: !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorForwardedValuesCookiesForward]
+            QueryString: !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorForwardedValuesQueryString]
+          MaxTTL: !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorMaxTTL]
+          MinTTL: !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorMinTTL]
+          SmoothStreaming: !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorSmoothStreaming]
+          TargetOriginId: !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorTargetOriginId]
+          #TrustedSigners:
+            #- !Ref AWS::AccountId
+          ViewerProtocolPolicy : !FindInMap [Distribution1, !Ref PropertyConfig, DefaultCacheBehaviorViewerProtocolPolicy]
+        DefaultRootObject: !FindInMap [Distribution1, !Ref PropertyConfig, DefaultRootObject]
+        Enabled: !FindInMap [Distribution1, !Ref PropertyConfig, Enabled]
+        HttpVersion: !FindInMap [Distribution1, !Ref PropertyConfig, HttpVersion]
+        IPV6Enabled: !FindInMap [Distribution1, !Ref PropertyConfig, IPV6Enabled]
+        Origins:
+          -
+            DomainName: !Join ['', [!Ref SiteNameSite1, .s3.amazonaws.com]]
+            Id: !FindInMap [Distribution1, !Ref PropertyConfig, OriginsId]
+            OriginPath: !FindInMap [Distribution1, !Ref PropertyConfig, OriginsOriginPath]
+            S3OriginConfig:
+              OriginAccessIdentity: !Join ['', [origin-access-identity/cloudfront/, !FindInMap [Distribution1, !Ref PropertyConfig, OriginsOriginAccessIdentity]]]
+        PriceClass: !FindInMap [Distribution1, !Ref PropertyConfig, PriceClass]
+        Restrictions:
+          GeoRestriction:
+            Locations:
+              !FindInMap [Distribution1, !Ref PropertyConfig, RestrictionsLocations]
+            RestrictionType: !FindInMap [Distribution1, !Ref PropertyConfig, RestrictionsRestrictionType]
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ACMCertificateArn
+          MinimumProtocolVersion: !FindInMap [Distribution1, !Ref PropertyConfig, ViewerCertificateMinimumProtocolVersion]
+          SslSupportMethod: !FindInMap [Distribution1, !Ref PropertyConfig, ViewerCertificateSslSupportMethod]
+      Tags:
+        -  
+          Key: Name
+          Value: !Ref SiteNameSite1
+  # Route53
+  RecordSetGroup1:
+    DependsOn: ["Bucket1","Distribution1"]
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneName: !Sub 
+        - ${Domain}.
+        - Domain: !Ref DomainNameDomain1
+      Comment: !FindInMap [RecordSetGroup1, !Ref PropertyConfig, Comment]
+      RecordSets:
+        - 
+          Name: !Sub 
+            - ${SiteName}.
+            - SiteName: !Ref SiteNameSite1
+          Type: !FindInMap [RecordSetGroup1, !Ref PropertyConfig, RecordSets1Type]
+          AliasTarget:
+            HostedZoneId: !FindInMap [ CDNRegionMap, !Ref 'AWS::Region', hostedzoneID]   
+            DNSName: !GetAtt Distribution1.DomainName
+        -
+          Name: !Sub
+            - www.${SiteName}.
+            - SiteName: !Ref SiteNameSite1
+          Type: !FindInMap [RecordSetGroup1, !Ref PropertyConfig, RecordSets2Type]
+          AliasTarget:
+            HostedZoneId: !Ref HostedZoneIdRecordSetGroup1
+            DNSName: !Sub
+              - ${SiteName}.
+              - SiteName: !Ref SiteNameSite1
+  # S3
+  Bucket2:
+    DependsOn: ["Key1"]
+    Type: "AWS::S3::Bucket"
+    Properties: 
+      AccessControl: !FindInMap [Bucket2, !Ref PropertyConfig, AccessControl]
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+          - 
+            ServerSideEncryptionByDefault: 
+              KMSMasterKeyID: !Ref Key1
+              SSEAlgorithm: !FindInMap [Bucket2, !Ref PropertyConfig, BucketEncryptionSSEAlgorithm]
+      BucketName: !Join ['', ['code.', !Ref SiteNameSite1]]
+      LifecycleConfiguration:
+        Rules:
+          - 
+            AbortIncompleteMultipartUpload: 
+              DaysAfterInitiation: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1DaysAfterInitiation]
+            ExpirationInDays: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1ExpirationInDays]
+            Id: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1Id]
+            NoncurrentVersionExpirationInDays: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1NoncurrentVersionExpirationInDays]
+            NoncurrentVersionTransitions:
+              - 
+                StorageClass: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1NoncurrentVersionTransitions1StorageClass]
+                TransitionInDays: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1NoncurrentVersionTransitions1TransitionInDays]
+            Prefix: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1Prefix]
+            Status: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1Status]
+            Transitions:
+              - 
+                StorageClass: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1Transitions1StorageClass]
+                TransitionInDays: !FindInMap [Bucket2, !Ref PropertyConfig, LifecycleConfigurationRules1Transitions1TransitionInDays]
+      Tags:
+        - Key: Name
+          Value: !Join ['', ['code.', !Ref SiteNameSite1]]
+      VersioningConfiguration:
+        Status: !FindInMap [Bucket2, !Ref PropertyConfig, VersioningConfigurationStatus]
+  BucketPolicy2:
+    DependsOn: ["Bucket2"]
+    Type: "AWS::S3::BucketPolicy"
+    Properties: 
+      Bucket: !Join ['', ['code.', !Ref SiteNameSite1]]
+      PolicyDocument: 
+        Version: '2012-10-17'
+        Id: PutObjEncryptionPolicy
+        Statement:
+          - Sid: DenyIncorrectEncryptionHeader
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Join ['', ['arn:aws:s3:::', !Join ['', ['code.', !Ref SiteNameSite1]], '/*']]
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': aws:kms
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Join ['', ['arn:aws:s3:::', !Join ['', ['code.', !Ref SiteNameSite1]], '/*']]
+            Condition:
+              'Null':
+                's3:x-amz-server-side-encryption': 'true'
+  # IAM
+  Policy1:
+    DependsOn: ["Role1"]
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyDocument: 
+        Version: 2012-10-17
+        Id: CodeBuildAccess
+        Statement:
+          - Effect: Allow
+            Sid: CodeBuildAccessEC2
+            Action:
+              - 'logs:*'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:DescribeNetworkInterfaces'
+              - 'ec2:DeleteNetworkInterface'
+              - 'ec2:DescribeSubnets'
+              - 'ec2:DescribeSecurityGroups'
+              - 'ec2:DescribeDhcpOptions'
+              - 'ec2:DescribeVpcs'
+              - 'ec2:CreateNetworkInterfacePermission'
+            Resource: '*'
+          - Effect: Allow
+            Sid: CodeBuildAccessCloudWatchLogGroup
+            Resource:
+              - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
+              - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*:*'
+            Action:
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+          - Effect: Allow
+            Sid: CodeBuildAccessS3BucketCodePipeline
+            Resource:
+              - !Sub 'arn:aws:s3:::codepipeline-${AWS::Region}-*'
+              - !Join ["", [ "arn:aws:s3:::", "code.", !Ref SiteNameSite1, "/*"]]
+            Action:
+              - 's3:PutObject'
+              - 's3:GetObject'
+              - 's3:GetObjectVersion'
+          - Effect: Allow
+            Sid: CodeBuildAccessS3BucketCodeBuild
+            Resource:
+              - !Join ["", [ "arn:aws:s3:::", "code.", !Ref SiteNameSite1, "/*"]]
+            Action:
+              - 's3:PutObject'
+      PolicyName: !FindInMap [Policy1, !Ref PropertyConfig, PolicyName]
+      Roles: !FindInMap [Policy1, !Ref PropertyConfig, Roles]
+  # CodeBuild
+  Project1:
+    DependsOn: ["Role1","Key1","Bucket2"]
+    Type: "AWS::CodeBuild::Project"
+    Properties: 
+      Artifacts:
+        Location: !Join ['', ['code.', !Ref SiteNameSite1]]
+        Name: !Join ['', ['code.', !Ref SiteNameSite1, '.zip']]
+        NamespaceType: !FindInMap [Project1, !Ref PropertyConfig, ArtifactsNamespaceType]
+        Packaging: !FindInMap [Project1, !Ref PropertyConfig, ArtifactsPackaging]
+        Path: !FindInMap [Project1, !Ref PropertyConfig, ArtifactsPath]
+        Type: !FindInMap [Project1, !Ref PropertyConfig, ArtifactsType]
+      BadgeEnabled: !FindInMap [Project1, !Ref PropertyConfig, BadgeEnabled]
+      Cache: 
+        Location: !FindInMap [Project1, !Ref PropertyConfig, CacheLocation]
+        Type: !FindInMap [Project1, !Ref PropertyConfig, CacheType]
+      Description: !FindInMap [Project1, !Ref PropertyConfig, Description]
+      EncryptionKey: !GetAtt Key1.Arn
+      Environment:
+        ComputeType: !FindInMap [Project1, !Ref PropertyConfig, EnvironmentComputeType]
+        EnvironmentVariables:
+          - 
+            Name: !FindInMap [Project1, !Ref PropertyConfig, EnvironmentVariablesName]
+            Type: !FindInMap [Project1, !Ref PropertyConfig, EnvironmentVariablesType]
+            Value: !FindInMap [Project1, !Ref PropertyConfig, EnvironmentVariablesValue]
+        Image: !FindInMap [Project1, !Ref PropertyConfig, EnvironmentImage]
+        PrivilegedMode: !FindInMap [Project1, !Ref PropertyConfig, EnvironmentPrivilegedMode]
+        Type: !FindInMap [Project1, !Ref PropertyConfig, EnvironmentType]
+      Name: !Ref AWS::StackName
+      ServiceRole: !Ref Role1
+      Source:
+        BuildSpec: !FindInMap [Project1, !Ref PropertyConfig, SourceBuildSpec]
+        GitCloneDepth: !FindInMap [Project1, !Ref PropertyConfig, SourceGitCloneDepth]
+        InsecureSsl: !FindInMap [Project1, !Ref PropertyConfig, SourceInsecureSsl]
+        Location: !Ref SourceLocationProject1
+        Type: !FindInMap [Project1, !Ref PropertyConfig, SourceType]
+      Tags:
+        -  
+          Key: Name
+          Value: !Join ['-', [ServerlessStaticWebsite, !Ref SiteNameSite1]]
+      TimeoutInMinutes: !FindInMap [Project1, !Ref PropertyConfig, TimeoutInMinutes]
+  # SNS
+  Topic2:
+    Type: "AWS::SNS::Topic"
+    Properties: 
+      DisplayName: !FindInMap [Topic2, !Ref PropertyConfig, DisplayName]
+      Subscription:
+        -
+          Endpoint: !Ref SubscriptionEndpointTopic2
+          Protocol: !FindInMap [Topic2, !Ref PropertyConfig, SubscriptionProtocol]
+      TopicName: !Ref ApplicationId
+  # IAM
+  Policy2:
+    DependsOn: ["Role2"]
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyDocument: 
+        Version: 2012-10-17
+        Id: LambdaBasicExecution
+        Statement:
+          - Sid: AccessCloudWatchLogGroup
+            Effect: Allow
+            Action:
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+            Resource: '*'
+          - Sid: AccessS3
+            Effect: Allow
+            Action:
+              - 's3:List*'
+              - 's3:Get*'
+            Resource: !Join ["", [ "arn:aws:s3:::", "code.", !Ref SiteNameSite1, "/*"]]
+          - Sid: PutS3
+            Effect: Allow
+            Action:
+              - 's3:List*'
+              - 's3:Get*'
+              - 's3:PutObject'
+              - 's3:PutObjectAcl'
+            Resource: !Sub 'arn:aws:s3:::${SiteNameSite1}/*'
+          - Sid: SNSPublish
+            Effect: Allow
+            Action:
+              - 'sns:Publish'
+            Resource: !Join ["", ["arn:aws:sns:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId", ":", !Ref ApplicationId]]
+          - Sid: CodePipelinePutJobSuccess
+            Effect: Allow
+            Action:
+              - 'codepipeline:PutJobSuccessResult'
+            Resource: '*'
+      PolicyName: !FindInMap [Policy2, !Ref PropertyConfig, PolicyName]
+      Roles: !FindInMap [Policy2, !Ref PropertyConfig, Roles]
+  # Lambda
+  Function1:
+    DependsOn: ["Role2","Key1","Bucket1","Bucket2"]
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code: 
+        ZipFile: !Sub | 
+          import boto3
+          from botocore.client import Config
+          import zipfile
+          from io import StringIO
+          import io
+          import mimetypes
+          import os
+                
+          def lambda_handler(event, context):
+            sns = boto3.resource('sns')
+            topic = sns.Topic('arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ApplicationId}')
+                
+            location = {
+              "bucketName": os.environ['bucketName'],
+              "objectKey": os.environ['objectKey']
+            }
+                
+            try:
+              job = event.get("CodePipeline.job")
+            
+              if job:
+                  for artifact in job["data"]["inputArtifacts"]:
+                      if artifact["name"] == "MyAppBuild":
+                          location = artifact["location"]["s3Location"]
+          
+              print ("Building application from " + str(location))
+            
+              s3 = boto3.resource('s3')
+                
+              s3_bucket_code = s3.Bucket(location["bucketName"])
+              s3_bucket_app = s3.Bucket('${SiteNameSite1}')
+                
+              app_zip = io.BytesIO()
+              s3_bucket_code.download_fileobj(location["objectKey"], app_zip)
+            
+              with zipfile.ZipFile(app_zip) as myzip:
+                for i in myzip.namelist():
+                  obj = myzip.open(i)
+                  s3_bucket_app.upload_fileobj(obj,i,
+                    ExtraArgs={'ContentType': mimetypes.guess_type(i)[0]})
+                  s3_bucket_app.Object(i).Acl().put(ACL='public-read')
+                
+              print ("Completed Successfully")
+              topic.publish(Subject="Application Deployed", Message="Application Extract Upload Successful.")
+              if job:
+                  codepipeline = boto3.client('codepipeline')
+                  codepipeline.put_job_success_result(jobId=job["id"])
+            except:
+              topic.publish(Subject="Application Deploy Failed", Message="Application Extract Upload Unsuccessful.")
+              raise
+                
+            return 'Code Extract from ZipFile, and S3 File Upload Completed Successfully'
+      Description: !FindInMap [Function1, !Ref PropertyConfig, Description]
+      Environment:
+        Variables:
+          bucketName: !Join ['', ['code.', !Ref SiteNameSite1]]
+          objectKey: !Join ['', ['code.', !Ref SiteNameSite1, '.zip']]
+      FunctionName: !Join ['-', [!Ref 'AWS::StackName', !FindInMap [Function1, !Ref PropertyConfig, FunctionName]]]
+      Handler: !FindInMap [Function1, !Ref PropertyConfig, Handler]
+      KmsKeyArn: !GetAtt Key1.Arn
+      MemorySize: !FindInMap [Function1, !Ref PropertyConfig, MemorySize]
+      Role: !GetAtt Role2.Arn
+      Runtime: !FindInMap [Function1, !Ref PropertyConfig, Runtime]
+      Timeout: !FindInMap [Function1, !Ref PropertyConfig, Timeout]
+      Tags: 
+        -  
+          Key: Name
+          Value: !Join ['-', [!Ref 'AWS::StackName', !FindInMap [Function1, !Ref PropertyConfig, FunctionName]]]
+  # IAM
+  Policy3:
+    DependsOn: ["Role3"]
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyDocument: 
+        Version: 2012-10-17
+        Id: CodePipelineAccess
+        Statement:
+          - Sid: CodePipelineAccessS3Get
+            Action:
+              - 's3:GetObject'
+              - 's3:GetObjectVersion'
+              - 's3:GetBucketVersioning'
+            Resource: '*'
+            Effect: Allow
+          - Sid: CodePipelineAccessS3Put
+            Action:
+              - 's3:PutObject'
+              - 's3:PutObjectAcl'
+            Resource:
+              - 'arn:aws:s3:::code*'
+              - 'arn:aws:s3:::codepipeline*'
+              - 'arn:aws:s3:::elasticbeanstalk*'
+            Effect: Allow
+          - Sid: CodeCommitAccess
+            Action:
+              - 'codecommit:CancelUploadArchive'
+              - 'codecommit:GetBranch'
+              - 'codecommit:GetCommit'
+              - 'codecommit:GetUploadArchiveStatus'
+              - 'codecommit:UploadArchive'
+            Resource: '*'
+            Effect: Allow
+          - Sid: CodeDeployAccessDeployment
+            Action:
+              - 'codedeploy:CreateDeployment'
+              - 'codedeploy:GetApplicationRevision'
+              - 'codedeploy:GetDeployment'
+              - 'codedeploy:GetDeploymentConfig'
+              - 'codedeploy:RegisterApplicationRevision'
+            Resource: '*'
+            Effect: Allow
+          - Sid: AWSServiceAccess
+            Action:
+              - 'elasticbeanstalk:*'
+              - 'ec2:*'
+              - 'elasticloadbalancing:*'
+              - 'autoscaling:*'
+              - 'cloudwatch:*'
+              - 's3:*'
+              - 'sns:*'
+              - 'cloudformation:*'
+              - 'rds:*'
+              - 'sqs:*'
+              - 'ecs:*'
+              - 'iam:PassRole'
+            Resource: '*'
+            Effect: Allow
+          - Sid: LambdaAccess
+            Action:
+              - 'lambda:InvokeFunction'
+              - 'lambda:ListFunctions'
+            Resource: '*'
+            Effect: Allow
+          - Sid: OpsWorksAccess
+            Action:
+              - 'opsworks:CreateDeployment'
+              - 'opsworks:DescribeApps'
+              - 'opsworks:DescribeCommands'
+              - 'opsworks:DescribeDeployments'
+              - 'opsworks:DescribeInstances'
+              - 'opsworks:DescribeStacks'
+              - 'opsworks:UpdateApp'
+              - 'opsworks:UpdateStack'
+            Resource: '*'
+            Effect: Allow
+          - Sid: CloudFormationAccess
+            Action:
+              - 'cloudformation:CreateStack'
+              - 'cloudformation:DeleteStack'
+              - 'cloudformation:DescribeStacks'
+              - 'cloudformation:UpdateStack'
+              - 'cloudformation:CreateChangeSet'
+              - 'cloudformation:DeleteChangeSet'
+              - 'cloudformation:DescribeChangeSet'
+              - 'cloudformation:ExecuteChangeSet'
+              - 'cloudformation:SetStackPolicy'
+              - 'cloudformation:ValidateTemplate'
+              - 'iam:PassRole'
+            Resource: '*'
+            Effect: Allow
+          - Sid: CodeDeployAccessBuild
+            Action:
+              - 'codebuild:BatchGetBuilds'
+              - 'codebuild:StartBuild'
+            Resource: '*'
+            Effect: Allow
+      PolicyName: !FindInMap [Policy3, !Ref PropertyConfig, PolicyName]
+      Roles: !FindInMap [Policy3, !Ref PropertyConfig, Roles]
+  # CodePipeline
+  Pipeline1:
+    DependsOn: ["Role3","Bucket2"]
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      ArtifactStore:
+        EncryptionKey: 
+          Id: !GetAtt Key1.Arn
+          Type: !FindInMap [Pipeline1, !Ref PropertyConfig, ArtifactStoreEncryptionKeyType]
+        Location: !Ref Bucket2
+        Type: !FindInMap [Pipeline1, !Ref PropertyConfig, ArtifactStoreType]
+      Name: !Ref AWS::StackName
+      RestartExecutionOnUpdate: !FindInMap [Pipeline1, !Ref PropertyConfig, RestartExecutionOnUpdate]
+      RoleArn: !GetAtt Role3.Arn
+      Stages:
+        - 
+          Actions:
+            - 
+              ActionTypeId:
+                Category: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages1ActionsActionTypeIdCategory]
+                Owner: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages1ActionsActionTypeIdOwner]
+                Provider: !Ref Provider
+                Version: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages1ActionsActionTypeIdVersion]
+              Configuration:
+                Branch: !Ref Branch
+                OAuthToken: !Ref OAuthToken
+                Owner: !Ref Owner
+                PollForSourceChanges: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages1ActionsConfigurationPollForSourceChanges]
+                Repo: !Ref Repo
+              Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages1ActionsName]
+              OutputArtifacts:
+                -
+                  Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages1ActionsOutputArtifactsName]
+              RunOrder: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages1ActionsRunOrder]
+          Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages1Name]      
+        - 
+          Actions:
+            - 
+              ActionTypeId:
+                Category: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages2ActionsActionTypeIdCategory]
+                Owner: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages2ActionsActionTypeIdOwner]
+                Provider: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages2ActionsActionTypeIdProvider]
+                Version: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages2ActionsActionTypeIdVersion]
+              Configuration:
+                ProjectName: !Ref "AWS::StackName"
+              InputArtifacts:
+                -
+                  Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages2ActionsInputArtifactsName]
+              Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages2ActionsName]
+              OutputArtifacts:
+                -
+                  Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages2ActionsOutputArtifactsName]
+              RunOrder: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages2ActionsRunOrder]
+          Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages2Name]
+        - 
+          Actions:
+            - 
+              ActionTypeId:
+                Category: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages3ActionsActionTypeIdCategory]
+                Owner: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages3ActionsActionTypeIdOwner]
+                Provider: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages3ActionsActionTypeIdProvider]
+                Version: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages3ActionsActionTypeIdVersion]
+              Configuration:
+                FunctionName: !Ref Function1
+              InputArtifacts:
+                -
+                  Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages3ActionsInputArtifactsName]
+              Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages3ActionsName]
+              RunOrder: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages3ActionsRunOrder]
+          Name: !FindInMap [Pipeline1, !Ref PropertyConfig, Stages3Name]
+Outputs:
+  # IAM Role1 - CodeBuild
+  Role1:
+    Description: Returns the resource name
+    Value: !Ref Role1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Role1 ]]
+  Role1Arn:
+    Description: Returns the Arn.
+    Value: !GetAtt Role1.Arn
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Role1Arn ]]
+  # IAM Role2 - Lambda
+  Role2:
+    Description: Returns the resource name
+    Value: !Ref Role2
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Role2 ]]
+  Role2Arn:
+    Description: Returns the Arn.
+    Value: !GetAtt Role2.Arn
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Role2Arn ]]
+  # IAM Role3 - CodePipeline
+  Role3:
+    Description: Returns the resource name
+    Value: !Ref Role3
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Role3 ]]
+  Role3Arn:
+    Description: Returns the Arn.
+    Value: !GetAtt Role3.Arn
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Role3Arn ]]
+  # KMS Key1 - Account
+  Key1:
+    Description: Returns the key ID
+    Value: !Ref Key1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Key1 ]]
+  Key1Arn:
+    Description: Returns the Key Arn
+    Value: !GetAtt Key1.Arn
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Key1Arn ]]
+  # KMS Alias1 - Account
+  Alias1:
+    Description: Returns the alias name
+    Value: !Ref Alias1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Alias1 ]]
+  # S3 Bucket1 - Website
+  Bucket1:
+    Description: Returns the resource name
+    Value: !Ref Bucket1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Bucket1 ]]
+  Bucket1Arn:
+    Description: Returns the Arn.
+    Value: !GetAtt Bucket1.Arn
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Bucket1Arn ]]
+  Bucket1DomainName:
+    Description: Returns the IPv4 DNS name of the specified bucket.
+    Value: !GetAtt Bucket1.DomainName
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Bucket1DomainName ]]
+  Bucket1DualStackDomainName:
+    Description: Returns the IPv6 DNS name of the specified bucket.
+    Value: !GetAtt Bucket1.DualStackDomainName
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Bucket1DualStackDomainName]]
+  # CloudFront Distribution1 - Website
+  Distribution1:
+    Description: Returns the CloudFront distribution ID. 
+    Value: !Ref Distribution1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Distribution1 ]]
+  Distribution1DomainName:
+    Description: Returns the DomainName.
+    Value: !GetAtt Distribution1.DomainName
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Distribution1DomainName ]]
+  # Route53 RecordSetGroup - Distribution1 Alias
+  RecordSetGroup1:
+    Description: Returns the resource name.  
+    Value: !Ref RecordSetGroup1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", RecordSetGroup1 ]]
+  # S3 Bucket2 - Code
+  Bucket2:
+    Description: Returns the resource name
+    Value: !Ref Bucket2
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Bucket2 ]]
+  Bucket2Arn:
+    Description: Returns the Arn.
+    Value: !GetAtt Bucket2.Arn
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Bucket2Arn ]]
+  Bucket2DomainName:
+    Description: Returns the IPv4 DNS name of the specified bucket.
+    Value: !GetAtt Bucket2.DomainName
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Bucket2DomainName ]]
+  Bucket2DualStackDomainName:
+    Description: Returns the IPv6 DNS name of the specified bucket.
+    Value: !GetAtt Bucket2.DualStackDomainName
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Bucket2DualStackDomainName]]
+  # IAM Policy1 - CodeBuild
+  Policy1:
+    Description: Returns the resource name
+    Value: !Ref Policy1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Policy1 ]]
+  # CodeBuild Project - Serverless Static Website
+  Project1:
+    Description: Returns the name of the AWS CodeBuild project.  
+    Value: !Ref Project1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Project1]]
+  Project1Arn:
+    Description: Returns the Arn.
+    Value: !GetAtt Project1.Arn
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Project1Arn]]
+  # SNS Topic2 - Website
+  Topic2:
+    Description: SNS Topic Name
+    Value: !Ref Topic2
+    Export: 
+      Name: !Join [ "-", [ "Acct", !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Topic2 ]]
+  # IAM Policy2 - Lambda
+  Policy2:
+    Description: Returns the resource name
+    Value: !Ref Policy2
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Policy2 ]]
+  # Lambda Function1 - Code-Extract-Upload
+  Function1:
+    Description: Returns the resource name.  
+    Value: !Ref Function1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Function1 ]]
+  Function1Arn:
+    Description: Returns the Arn.
+    Value: !GetAtt Function1.Arn
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Function1Arn]]
+  # IAM Policy3 - CodePipeline
+  Policy3:
+    Description: Returns the resource name
+    Value: !Ref Policy3
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Policy3 ]]
+  # CodePipeline - Pipeline1
+  Pipeline1:
+    Description: Returns the pipeline name 
+    Value: !Ref Pipeline1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Pipeline1 ]]
+Parameters:
+  # S3 Bucket1 - Website
+  SiteNameSite1:
+    Type: String
+    Description: The name of the Website...
+    Default: 'example.info'
+  # CloudFront Distribution1
+  ACMCertificateArn:
+    Type: String
+    Description: The arn of the Certificate ...
+    Default: 'arn:aws:acm:<region>:<account_id:certificate/<cert_id>'
+  # Route53 RecordSetGroup
+  DomainNameDomain1:
+    Type: String
+    Description: The name of the domain...
+    Default: 'example.info'
+  HostedZoneIdRecordSetGroup1:
+    Type: AWS::Route53::HostedZone::Id
+  # CodeBuild Project - Serverless Static Website
+  SourceLocationProject1:
+    Type: String
+    Description: The location of the source code for the specified repository type...
+    Default: 'https://github.com/${Account}/${Repo}.git'
+  # SNS Topic2 - Website
+  SubscriptionEndpointTopic2:
+    Type: String
+    Description: "The subscription's endpoint. User must confirm subscription"
+    Default: person@example.com
+    AllowedPattern: '\w[a-zA-Z0-9_\-\.]*@\w[a-zA-Z0-9\-\.]*'
+    ConstraintDescription: Must be a valid email address.
+    MinLength: '6'
+    MaxLength: '64'
+  # CodePipeline - Pipeline1
+  Provider:
+    Type: String
+    Description: 'The service provider...'
+    Default: 'GitHub'
+  Branch:
+    Type: String
+    Description: 'The Repo Branch'
+    Default: 'master'
+  OAuthToken:
+    Type: String
+    Description: 'Personal Access Token'
+  Owner:
+    Type: String
+    Description: 'Repo Owner'
+  Repo:
+    Type: String
+    Description: 'Repo'
+  # Developer - Configuration
+  ApplicationId:
+    Type: String
+    Description: 'A developer-defined string that can be used to uniquely name resources.'
+    MaxLength: 10
+  PropertyConfig:
+    Type: String
+    Description: 'A developer-defined string that can be used to configure this template.'
+    Default: defaults
+    AllowedValues:
+      - defaults
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Domain"
+        Parameters:
+          - DomainNameDomain1
+          - SiteNameSite1
+          - HostedZoneIdRecordSetGroup1
+          - ACMCertificateArn
+      - 
+        Label:
+          default: "Account Owner"
+        Parameters:
+          - SubscriptionEndpointTopic2
+      - 
+        Label:
+          default: "Repository"
+        Parameters:
+          - Provider
+          - Branch
+          - SourceLocationProject1
+          - Owner
+          - Repo
+          - OAuthToken
+      - 
+        Label:
+          default: "Developer - Configuration"
+        Parameters:
+          - ApplicationId
+          - PropertyConfig
+    ParameterLabels:
+      # S3 Bucket1 - Website
+      SiteNameSite1:
+        default: "Website"
+      # CloudFront Distribution1
+      ACMCertificateArn:
+        default: "The arn of the Certificate ..."
+      # Route53 Record Set Group
+      DomainNameDomain1:
+        default: "The name of the domain..."
+      HostedZoneIdRecordSetGroup1:
+        default: "Route53 HostedZoneId"
+      # CodeBuild Project - Serverless Static Website
+      SourceLocationProject1:
+        default: "The location of the source code for the specified repository type..."
+      # SNS Topic2 - Website
+      SubscriptionEndpointTopic2:
+        default: "Subscription's endpoint."
+      # CodePipeline - Pipeline1
+      Provider:
+        default: "Service provider"
+      Branch:
+        default: "Branch"
+      OAuthToken:
+        default: "Access Token"
+      Owner:
+        default: "Repo Owner"
+      Repo:
+        default: "Repo"
+      # Developer - Configuration
+      ApplicationId:
+        default: "Unique Application Id"
+      PropertyConfig:
+        default: "Property Configuration"
+Mappings: 
+  Role1: 
+    defaults: 
+      AssumeRolePolicyDocument: '{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": [
+                    "codebuild.amazonaws.com"
+                ]
+            },
+            "Action": [
+                "sts:AssumeRole"
+            ]
+        }
+    ]
+}'
+      RoleName: 'role-service-CodeBuild'
+  Role2: 
+    defaults: 
+      AssumeRolePolicyDocument: '{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": [
+                    "lambda.amazonaws.com"
+                ]
+            },
+            "Action": [
+                "sts:AssumeRole"
+            ]
+        }
+    ]
+}'
+      RoleName: 'role-service-Lambda'
+  Role3: 
+    defaults: 
+      AssumeRolePolicyDocument: '{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": [
+                    "codepipeline.amazonaws.com"
+                ]
+            },
+            "Action": [
+                "sts:AssumeRole"
+            ]
+        }
+    ]
+}'
+      RoleName: 'role-service-CodePipeline'
+  Key1: 
+    defaults: 
+      Description: 'KMS Key for Account'
+      Enabled: 'true'
+      EnableKeyRotation: 'true'
+  Alias1: 
+    defaults: 
+      AliasName: 'Account'
+  Bucket1: 
+    defaults: 
+      AccessControl: 'Private'
+      BucketEncryptionSSEAlgorithm: 'aws:kms'
+      #BucketName: 'example.info'
+      LifecycleConfigurationRules1DaysAfterInitiation: 7
+      LifecycleConfigurationRules1ExpirationInDays: 36500
+      LifecycleConfigurationRules1Id: 'CurrentExpiration100y_NoncurrentExpiration180d'
+      LifecycleConfigurationRules1NoncurrentVersionExpirationInDays: 180
+      LifecycleConfigurationRules1NoncurrentVersionTransitions1StorageClass: 'STANDARD_IA'
+      LifecycleConfigurationRules1NoncurrentVersionTransitions1TransitionInDays: 90
+      LifecycleConfigurationRules1Prefix: ''
+      LifecycleConfigurationRules1Status: 'Enabled'
+      LifecycleConfigurationRules1Transitions1StorageClass: 'STANDARD_IA'
+      LifecycleConfigurationRules1Transitions1TransitionInDays: 18250
+      VersioningConfigurationStatus: 'Enabled'
+      WebsiteConfigurationErrorDocument: 'index.html'
+      WebsiteConfigurationIndexDocument: 'error.html'
+  Distribution1: 
+    defaults: 
+      Comment: 'CloudFront Distribution using S3 Origin'
+      DefaultCacheBehaviorAllowedMethods: ['GET', 'HEAD']
+      DefaultCacheBehaviorCachedMethods: ['GET', 'HEAD']
+      DefaultCacheBehaviorDefaultTTL: 600   #Default: 86400
+      DefaultCacheBehaviorForwardedValuesCookiesForward: 'none'
+      DefaultCacheBehaviorForwardedValuesQueryString: 'false'
+      DefaultCacheBehaviorMaxTTL: 3600    #Default: 31536000
+      DefaultCacheBehaviorMinTTL: 0
+      DefaultCacheBehaviorSmoothStreaming: 'false'
+      DefaultCacheBehaviorTargetOriginId: 'S3Origin'
+      DefaultCacheBehaviorViewerProtocolPolicy: 'redirect-to-https'
+      DefaultRootObject: 'index.html'
+      Enabled: 'true'
+      HttpVersion: 'http1.1'
+      IPV6Enabled: 'true'
+      OriginsId: 'S3Origin'
+      OriginsOriginPath: ''
+      OriginsOriginAccessIdentity: 'E1XYWKKB1XYH61' #todo: pass OAI
+      PriceClass: 'PriceClass_100'
+      RestrictionsLocations: ['US']
+      RestrictionsRestrictionType: 'whitelist'
+      ViewerCertificateMinimumProtocolVersion: 'TLSv1.1_2016'
+      ViewerCertificateSslSupportMethod: 'sni-only'
+  RecordSetGroup1: 
+    defaults: 
+      #HostedZoneName: 'example.info'
+      Comment: 'Route53 RecordSetGroup CloudFront Distribution Alias'
+      #RecordSets1Name: 'example.info'
+      RecordSets1Type: 'A'
+      #RecordSets1AliasTargetDNSName: '*.cloudfront.net'
+      #RecordSets2Name: 'www.example.info'
+      RecordSets2Type: 'A'
+  Bucket2: 
+    defaults: 
+      AccessControl: 'Private'
+      BucketEncryptionSSEAlgorithm: 'aws:kms'
+      #BucketName: 'code.example.info'
+      LifecycleConfigurationRules1DaysAfterInitiation: 7
+      LifecycleConfigurationRules1ExpirationInDays: 36500
+      LifecycleConfigurationRules1Id: 'CurrentExpiration100y_NoncurrentExpiration180d'
+      LifecycleConfigurationRules1NoncurrentVersionExpirationInDays: 180
+      LifecycleConfigurationRules1NoncurrentVersionTransitions1StorageClass: 'STANDARD_IA'
+      LifecycleConfigurationRules1NoncurrentVersionTransitions1TransitionInDays: 90
+      LifecycleConfigurationRules1Prefix: ''
+      LifecycleConfigurationRules1Status: 'Enabled'
+      LifecycleConfigurationRules1Transitions1StorageClass: 'STANDARD_IA'
+      LifecycleConfigurationRules1Transitions1TransitionInDays: 18250
+      VersioningConfigurationStatus: 'Enabled'
+  BucketPolicy2: 
+    defaults: 
+      BucketPolicyBucket: 'code.example.info'
+  Policy1: 
+    defaults: 
+      PolicyName: 'policy-service-CodeBuild'
+      Roles: ['role-service-CodeBuild']
+  Project1: 
+    defaults: 
+      #ArtifactsLocation: 'code.example.info'
+      #ArtifactsName: 'code.example.info.zip'
+      ArtifactsNamespaceType: 'NONE'
+      ArtifactsPackaging: 'ZIP'
+      ArtifactsPath: ''
+      ArtifactsType: 'S3'
+      BadgeEnabled: 'false'
+      CacheLocation: ''
+      CacheType: 'NO_CACHE'
+      Description: 'CodeBuild Project - Serverless Static Website'
+      EnvironmentComputeType: 'BUILD_GENERAL1_SMALL'
+      EnvironmentVariablesName: 'environment'
+      EnvironmentVariablesType: 'PLAINTEXT'
+      EnvironmentVariablesValue: 'poc'
+      EnvironmentImage: 'aws/codebuild/nodejs:6.3.1'
+      EnvironmentPrivilegedMode: 'true'
+      EnvironmentType: 'LINUX_CONTAINER'
+      #Name: 'ServerlessStaticWebsite'
+      SourceBuildSpec: 'buildspec.yml'
+      SourceGitCloneDepth: 0
+      SourceInsecureSsl: 'false'
+      #SourceLocationProject1: 'https://github.com/${Account}/${Repo}.git'
+      SourceType: 'GITHUB'
+      TimeoutInMinutes: 60
+  Topic2: 
+    defaults: 
+      DisplayName: 'Serverless Static Website'
+      TopicName: 'Website'
+      SubscriptionProtocol: 'email'
+  Policy2: 
+    defaults: 
+      PolicyName: 'policy-service-Lambda'
+      Roles: ['role-service-Lambda']
+  Function1: 
+    defaults: 
+      #CodeZipFile: "ZipFile Hardcoded in CFN Template"
+      Description: 'Lambda Function - Code Extract Upload S3'
+      EnvironmentVariablesEnvironment: 'poc'
+      FunctionName: 'code-extract-upload-s3'
+      Handler: 'index.lambda_handler'
+      MemorySize: 128
+      Runtime: 'python3.6'
+      Timeout: 30
+      TracingConfigMode: 'PassThrough'
+  Policy3: 
+    defaults: 
+      PolicyName: 'policy-service-CodePipeline'
+      Roles: ['role-service-CodePipeline']
+  Pipeline1: 
+    defaults: 
+      ArtifactStoreEncryptionKeyType: 'KMS'
+      ArtifactStoreType: 'S3'
+      #Name: 'ServerlessStaticWebsite'
+      RestartExecutionOnUpdate: 'true'
+      Stages1ActionsActionTypeIdCategory: 'Source'
+      Stages1ActionsActionTypeIdOwner: 'ThirdParty'
+      Stages1ActionsActionTypeIdVersion: '1'
+      Stages1ActionsConfigurationPollForSourceChanges: 'true'
+      Stages1ActionsName: 'Source'
+      Stages1ActionsOutputArtifactsName: 'MyApp'
+      Stages1ActionsRunOrder: 1
+      Stages1Name: 'SourceCode'
+      Stages2ActionsActionTypeIdCategory: 'Build'
+      Stages2ActionsActionTypeIdOwner: 'AWS'
+      Stages2ActionsActionTypeIdProvider: 'CodeBuild'
+      Stages2ActionsActionTypeIdVersion: '1'
+      #Stages2ActionsConfigurationProjectName: 'ServerlessStaticWebsite'
+      Stages2ActionsInputArtifactsName: 'MyApp'
+      Stages2ActionsName: 'CodeBuild'
+      Stages2ActionsOutputArtifactsName: 'MyAppBuild'
+      Stages2ActionsRunOrder: 1
+      Stages2Name: 'Build'
+      Stages3ActionsActionTypeIdCategory: 'Invoke'
+      Stages3ActionsActionTypeIdOwner: 'AWS'
+      Stages3ActionsActionTypeIdProvider: 'Lambda'
+      Stages3ActionsActionTypeIdVersion: '1'
+      Stages3ActionsInputArtifactsName: 'MyAppBuild'
+      Stages3ActionsName: 'Deploy'
+      Stages3ActionsRoleArn: ''
+      Stages3ActionsRunOrder: 1
+      Stages3Name: 'Deploy'
+  CDNRegionMap:
+    us-east-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    us-east-2:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    us-west-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    us-west-2:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    ca-central-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    sa-east-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.   
+    eu-central-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    eu-west-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    eu-west-2:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.   
+    ap-northeast-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    ap-northeast-2:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    ap-southeast-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    ap-southeast-2:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    ap-south-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.
+    sa-east-1:
+      hostedzoneID: Z2FDTNDATAQYW2
+      endpoint: cloudfront.amazonaws.com.

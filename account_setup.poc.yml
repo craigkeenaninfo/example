@@ -1,0 +1,259 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Account Setup
+Resources:
+  Topic1:
+    Type: "AWS::SNS::Topic"
+    Properties: 
+      DisplayName: !FindInMap [Topic1, !Ref PropertyConfig, DisplayName]
+      Subscription:
+        -
+          Endpoint: !Ref SubscriptionEndpointTopic1
+          Protocol: !FindInMap [Topic1, !Ref PropertyConfig, SubscriptionProtocol]
+      TopicName: !FindInMap [Topic1, !Ref PropertyConfig, TopicName]         
+  Alarm1:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      ActionsEnabled: !FindInMap [Alarm1, !Ref PropertyConfig, ActionsEnabled]
+      AlarmActions:
+        - !Join ['', ['arn:aws:sns:',!Ref 'AWS::Region',':',!Ref 'AWS::AccountId',':',!FindInMap [Alarm1, !Ref PropertyConfig, SNSTopicName]]]
+      AlarmDescription: !Sub >
+        "Alarm if Value is over $${ThresholdAlarm1}"
+      AlarmName: !Join ['-', [!FindInMap [Alarm1, !Ref PropertyConfig, AlarmName], !Ref 'AWS::AccountId']]
+      ComparisonOperator: !FindInMap [Alarm1, !Ref PropertyConfig, ComparisonOperator]
+      Dimensions:
+        - Name: !FindInMap [Alarm1, !Ref PropertyConfig, DimensionsName]
+          Value: !FindInMap [Alarm1, !Ref PropertyConfig, DimensionsValue]
+      EvaluationPeriods: !FindInMap [Alarm1, !Ref PropertyConfig, EvaluationPeriods]
+      InsufficientDataActions:
+        - !Join ['', ['arn:aws:sns:',!Ref 'AWS::Region',':',!Ref 'AWS::AccountId',':',!FindInMap [Alarm1, !Ref PropertyConfig, SNSTopicName]]]
+      MetricName: !FindInMap [Alarm1, !Ref PropertyConfig, MetricName]
+      Namespace: !FindInMap [Alarm1, !Ref PropertyConfig, Namespace]
+      OKActions:
+        - !Join ['', ['arn:aws:sns:',!Ref 'AWS::Region',':',!Ref 'AWS::AccountId',':',!FindInMap [Alarm1, !Ref PropertyConfig, SNSTopicName]]]
+      Period: !FindInMap [Alarm1, !Ref PropertyConfig, Period]
+      Statistic: !FindInMap [Alarm1, !Ref PropertyConfig, Statistic]
+      Threshold: !Ref ThresholdAlarm1
+      TreatMissingData: !FindInMap [Alarm1, !Ref PropertyConfig, TreatMissingData]
+      Unit: !FindInMap [Alarm1, !Ref PropertyConfig, Unit]
+  Group1:
+    Type: "AWS::IAM::Group"
+    Properties:
+      GroupName: !FindInMap [Group1, !Ref PropertyConfig, GroupName]
+      Policies:
+        - PolicyName: !FindInMap [Group1, !Ref PropertyConfig, PoliciesPolicyName]
+          PolicyDocument: !FindInMap [Group1, !Ref PropertyConfig, PoliciesPolicyDocument]
+  User1:
+    DependsOn: "Group1"
+    Type: "AWS::IAM::User"
+    Properties: 
+      Groups: !FindInMap [User1, !Ref PropertyConfig, Groups]
+      LoginProfile:
+        Password: !Ref LoginProfilePasswordUser1
+        PasswordResetRequired: !FindInMap [User1, !Ref PropertyConfig, LoginProfilePasswordResetRequired]
+      UserName: !Ref UserNameUser1
+  AccessKey1:
+    Type: "AWS::IAM::AccessKey"
+    Properties: 
+      Serial: !FindInMap [AccessKey1, !Ref PropertyConfig, Serial]
+      Status: !FindInMap [AccessKey1, !Ref PropertyConfig, Status]
+      UserName: !Ref User1
+  HostedZone1:
+    Type: "AWS::Route53::HostedZone"
+    Properties: 
+      HostedZoneConfig:
+        Comment: !Sub "Hosted Zone for Domain ${DomainNameDomain1}"
+      HostedZoneTags:
+        -  
+          Key: Name
+          Value: !Ref DomainNameDomain1
+        -
+          Key: Environment
+          Value: !FindInMap [HostedZone1, !Ref PropertyConfig, HostedZoneTagsEnvironment]
+      Name: !Ref DomainNameDomain1
+Outputs:
+  # SNS Topic1 - AcctBill
+  Topic1:
+    Description: SNS Topic Name
+    Value: !Ref Topic1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Topic1 ]]
+  # CloudWatch Alarm1 - AcctBill
+  Alarm1:
+    Description: Returns the value of the Alarm Name
+    Value: !Ref Alarm1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Alarm1 ]]
+  # IAM Group1 - Admin Account
+  Group1:
+    Description: Returns the value of the Group Name
+    Value: !Ref Group1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Group1 ]]
+  # IAM User1 - Admin Account
+  User1:
+    Description: Returns the value of the UserName
+    Value: !Ref User1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", User1 ]]
+  # IAM AccessKey1 - User1
+  AccessKey1:
+    Description: Returns the AccessKeyId.
+    Value: !Ref AccessKey1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", AccessKey1 ]]
+  AccessKey1SecretAccessKey:
+    Description: Returns the SecretAccessKey.
+    Value: !GetAtt AccessKey1.SecretAccessKey
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", AccessKey1SecretAccessKey ]]
+  # Route53 HostedZone1 - StaticWeb
+  DomainName1:
+    Description: Returns the Domain Name provided as parameter
+    Value: !Ref DomainNameDomain1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", Domain1 ]]
+  HostedZone1:
+    Description: Returns the resource name
+    Value: !Ref HostedZone1
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", HostedZone1 ]]
+  HostedZone1NameServers:
+    Description: Returns the set of name servers for the specific hosted zone.
+    Value: !Select [0, !GetAtt HostedZone1.NameServers]
+    Export: 
+      Name: !Join [ "-", [ !Ref "AWS::AccountId", !Ref "AWS::Region", !Ref "AWS::StackName", HostedZone1NameServers ]]
+Parameters:
+  # SNS Topic1 - AcctBill
+  SubscriptionEndpointTopic1:
+    Type: String
+    Description: "The subscription's endpoint. User must confirm subscription"
+    Default: person@example.com
+    AllowedPattern: '\w[a-zA-Z0-9_\-\.]*@\w[a-zA-Z0-9\-\.]*'
+    ConstraintDescription: Must be a valid email address.
+    MinLength: '6'
+    MaxLength: '64'
+  # CloudWatch Alarm1 - AcctBill
+  ThresholdAlarm1:
+    Type: String
+    Description: "The value against which the specified statistic is compared. Example $10."
+    Default: 10
+  # IAM User1 - Admin Account
+  UserNameUser1:
+    Type: String
+    Description: A name for the IAM User who should be the Account Admin.
+    Default: 'FirstnameLastname'  
+  LoginProfilePasswordUser1:
+    Type: String
+    Description: Login Profile Password
+    NoEcho: 'true'
+    #AllowedPattern: '[a-zA-z0-9]*'
+    MinLength: '6'
+    MaxLength: '24'
+    ConstraintDescription: Must contain at least one lowercase, uppercase, number and non-alphanumeric character.
+  # Route53 HostedZone1 - StaticWeb
+  DomainNameDomain1:
+    Type: String
+    Description: The name of the domain...
+    Default: 'example.info'
+  # Developer - Configuration
+  PropertyConfig:
+    Type: String
+    Description: 'A developer-defined string that can be used to configure this template.'
+    Default: defaults
+    AllowedValues:
+      - defaults
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Domain"
+        Parameters:
+          - DomainNameDomain1
+      - 
+        Label:
+          default: "SNS Topic Account Billing"
+        Parameters:
+          - SubscriptionEndpointTopic1
+      - 
+        Label:
+          default: "CloudWatch Alarm Account Billing" 
+        Parameters:
+          - ThresholdAlarm1
+      - 
+        Label:
+          default: "IAM User Admin Account"
+        Parameters:
+          - UserNameUser1
+          - LoginProfilePasswordUser1
+      - 
+        Label:
+          default: "Developer - Configuration" 
+        Parameters:
+          - PropertyConfig
+    ParameterLabels:
+      # SNS Topic1 - AcctBill
+      SubscriptionEndpointTopic1:
+        default: "Subscription's endpoint."
+      # CloudWatch Alarm1 - AcctBill
+      ThresholdAlarm1:
+        default: "Alarm Threshold $"
+      UserNameUser1:
+        default: "A name for the IAM user."
+      LoginProfilePasswordUser1:
+        default: "Login Profile Password"
+      # Domain - Domain Setup
+      DomainNameDomain1:
+        default: "The name of the domain..."
+      # Developer - Configuration
+      PropertyConfig:
+        default: "Property Configuration"
+Mappings: 
+  Topic1: 
+    defaults: 
+      DisplayName: 'Account Billing'
+      TopicName: 'AcctBill'
+      SubscriptionProtocol: 'email'
+  Alarm1: 
+    defaults: 
+      ActionsEnabled: 'true'
+      SNSTopicName: 'AcctBill'
+      AlarmName: 'AcctBill'
+      ComparisonOperator: 'GreaterThanThreshold'
+      DimensionsName: 'Currency'
+      DimensionsValue: 'USD'
+      EvaluateLowSampleCountPercentile: ''
+      EvaluationPeriods: '1'
+      ExtendedStatistic: ''
+      MetricName: 'EstimatedCharges'
+      Namespace: 'AWS/Billing'
+      Period: '21600'
+      Statistic: 'Maximum'
+      TreatMissingData: 'ignore'
+      Unit: 'None'
+  Group1: 
+    defaults: 
+      GroupName: 'group-admin-Account'
+      PoliciesPolicyName: 'policy-admin-All'
+      PoliciesPolicyDocument: '{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "*",
+            "Resource": "*"
+        }
+    ]
+}'
+  User1: 
+    defaults: 
+      Groups: ['group-admin-Account']
+      LoginProfilePasswordResetRequired: 'false'
+  AccessKey1: 
+    defaults: 
+      Serial: 1
+      Status: 'Active'
+  HostedZone1: 
+    defaults: 
+      HostedZoneTagsEnvironment: 'POC'
+  
