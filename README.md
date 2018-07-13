@@ -249,11 +249,11 @@ Unfortunately, CloudFormation currently supports email validation, while the com
     Provide the AccessKey and SecretAccessKey
 4. Request a Certifcate
 
-        aws acm request-certificate --domain-name *.<value> --validation-method DNS
+        aws acm request-certificate --domain-name <value> --subject-alternative-names *.<value> --validation-method DNS
 
     Example.
 
-            aws acm request-certificate --domain-name *.example.info --validation-method DNS
+            aws acm request-certificate --domain-name example.info --subject-alternative-names *.example.info --validation-method DNS 
 
     Returns.
 
@@ -318,3 +318,4 @@ Unfortunately, CloudFormation currently supports email validation, while the com
 
 ## Repository Status ##
 Initial Deploy
+Update ACM Commands (Require Domain Name & Subject Alternative Names)

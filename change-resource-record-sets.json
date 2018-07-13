@@ -1,0 +1,18 @@
+{
+    "Comment": "ACM Record Set",
+    "Changes": [
+      {
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+          "Name": "<REPLACE>",
+          "Type": "CNAME",
+          "TTL": 900,
+          "ResourceRecords": [
+            {
+              "Value": "<REPLACE>"
+            }
+          ]
+        }
+      }
+    ]
+  }
